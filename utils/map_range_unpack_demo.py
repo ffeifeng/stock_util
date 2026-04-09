@@ -1,0 +1,15 @@
+"""演示 x, y, z = map(str, range(3))"""
+
+print("=" * 50)
+print("range(3) ->", list(range(3)))
+mapped = list(map(str, range(3)))
+print("list(map(str, range(3))) ->", mapped, "（每个数转成字符串）")
+print()
+x, y, z = map(str, range(3))
+print("解包后:")
+print(f"  x = {x!r}   类型 {type(x).__name__}")
+print(f"  y = {y!r}   类型 {type(y).__name__}")
+print(f"  z = {z!r}   类型 {type(z).__name__}")
+print()
+print("题目所求: y =", repr(y))
+print("=" * 50)
