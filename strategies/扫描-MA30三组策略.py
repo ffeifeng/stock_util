@@ -1,5 +1,5 @@
 """
-扫描三组股票：
+MA30 三组策略扫描：
   A组：指定日收盘在 MA30 上方（阴线整理，离MA30在5%以内）
   B组：指定日首次跌破 MA30（前一天还在上方，当天才破）
   C组：前一天在 MA30 下方，当天站回 MA30 上方（强势修复信号）
@@ -11,9 +11,9 @@
   output/MA30扫描_数据库.json
 
 用法：
-  python 扫描-首次跌破MA30.py          # 扫最新一天
-  python 扫描-首次跌破MA30.py 1        # 扫昨天
-  python 扫描-首次跌破MA30.py 2        # 扫前天
+  python 扫描-MA30三组策略.py          # 扫最新一天
+  python 扫描-MA30三组策略.py 1        # 扫昨天
+  python 扫描-MA30三组策略.py 2        # 扫前天
 """
 import struct, os, sys, json
 from datetime import datetime

@@ -1,11 +1,11 @@
 """
-大盘阶段分析：2025-01 至 2026-03
+大盘阶段分析：2025-01 至今
 基于沪指(sh000001)日线数据，统计：
   - 企稳阶段（何时开始、何时结束）
   - 适合做波段的时期
   - 适合空仓的时期
 """
-import struct, os
+import struct, os, webbrowser
 
 if __import__('sys').stdout.__class__.__name__ != 'NoneType':
     try: __import__('sys').stdout.reconfigure(encoding='utf-8')
@@ -185,3 +185,121 @@ for p in phases:
 
 print()
 print('  图例：★做波段=收盘>MA30且MA30向上  △企稳观察=贴近MA30或站上但未确认  ▼空仓=跌破MA30且MA30向下')
+
+
+# ── 生成 HTML 时间轴 ──────────────────────────────────────────────────
+
+def get_action(seg, is_last=False):
+    phase = seg['phase']
+    pct   = (seg['end_close'] - seg['start_close']) / seg['start_close'] * 100
+    start_month = int(str(seg['start'])[4:6])
+    if phase == '空仓':
+        return '现在空仓' if is_last else '不操作'
+    elif phase == '做波段':
+        if pct > 10:   return '全年最佳'
+        if start_month == 1 and pct > 1.5: return '年初行情'
+        if pct > 2:    return '可做'
+        return '谨慎'
+    else:  # 企稳观察
+        if pct < -1.5: return '观望'
+        # 高位整理：前一段是大涨做波段
+        idx = final.index(seg)
+        if idx > 0 and final[idx-1]['phase'] == '做波段':
+            prev_pct = (final[idx-1]['end_close'] - final[idx-1]['start_close']) / final[idx-1]['start_close'] * 100
+            if prev_pct > 8: return '持仓'
+        return '轻仓'
+
+def get_change_desc(seg, is_last=False):
+    pct  = (seg['end_close'] - seg['start_close']) / seg['start_close'] * 100
+    sc   = int(seg['start_close'])
+    ec   = int(seg['end_close'])
+    sign = '+' if pct >= 0 else ''
+    if seg['phase'] == '企稳观察':
+        if abs(pct) < 1.5: return '小幅震荡'
+        if pct < -1.5:     return '震荡下行'
+        if seg['days'] <= 8: return '过渡'
+        return '高位整理'
+    if seg['phase'] == '做波段' and abs(pct) < 1.5:
+        return '反复震荡'
+    end_label = '至今' if is_last else str(ec)
+    return f'{sc} → {end_label}<br><small>({sign}{pct:.1f}%)</small>'
+
+last_date_str = fmt_date(phases[-1]['date'])
+first_date_str = fmt_date(phases[0]['date'])
+
+rows_html = ''
+PHASE_STYLE = {
+    '做波段':  ('★ 做波段',  '#27ae60', '#1e8449'),
+    '企稳观察': ('△ 企稳观察', '#e67e22', '#ca6f1e'),
+    '空仓':    ('▼ 空仓',    '#c0392b', '#a93226'),
+}
+ACTION_COLOR = {
+    '全年最佳': '#f1c40f', '年初行情': '#2ecc71', '可做': '#2ecc71',
+    '谨慎': '#e67e22', '轻仓': '#e67e22', '持仓': '#3498db',
+    '观望': '#95a5a6', '不操作': '#7f8c8d', '现在空仓': '#e74c3c',
+    '过渡': '#e67e22',
+}
+
+for i, seg in enumerate(final):
+    is_last = (i == len(final) - 1)
+    label, bg, bg2 = PHASE_STYLE[seg['phase']]
+    pct  = (seg['end_close'] - seg['start_close']) / seg['start_close'] * 100
+    action = get_action(seg, is_last)
+    change = get_change_desc(seg, is_last)
+    act_color = ACTION_COLOR.get(action, '#95a5a6')
+    end_disp = '至今' if is_last else fmt_date(seg['end'])
+    days_disp = f'{seg["days"]}天{"+" if is_last else ""}'
+    rows_html += f'''
+    <tr>
+      <td><span class="phase-badge" style="background:{bg};border-left:4px solid {bg2}">{label}</span></td>
+      <td class="date-cell">{fmt_date(seg["start"])} → {end_disp}</td>
+      <td class="days-cell">{days_disp}</td>
+      <td class="change-cell">{change}</td>
+      <td><span class="action-badge" style="background:{act_color}22;color:{act_color};border:1px solid {act_color}55">{action}</span></td>
+    </tr>'''
+
+html = f'''<!DOCTYPE html>
+<html lang="zh"><head><meta charset="utf-8">
+<title>大盘阶段时间轴</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{background:#0f0f1a;color:#e0e0e0;font-family:"Microsoft YaHei",sans-serif;padding:24px}}
+  h2{{color:#a0c4ff;font-size:1.1rem;margin-bottom:16px;letter-spacing:1px}}
+  table{{width:100%;border-collapse:collapse;font-size:0.88rem}}
+  th{{background:#1a1a2e;color:#8899bb;font-weight:500;padding:10px 14px;text-align:left;
+      border-bottom:1px solid #2a2a4a;letter-spacing:0.5px}}
+  td{{padding:10px 14px;border-bottom:1px solid #1e1e32;vertical-align:middle}}
+  tr:hover td{{background:#1a1a30}}
+  .phase-badge{{display:inline-block;padding:3px 10px;border-radius:4px;font-size:0.82rem;
+               font-weight:600;color:#fff;letter-spacing:0.5px}}
+  .action-badge{{display:inline-block;padding:3px 10px;border-radius:12px;font-size:0.82rem;font-weight:600}}
+  .date-cell{{color:#aabbdd;font-size:0.83rem;letter-spacing:0.3px}}
+  .days-cell{{color:#6699cc;font-weight:600;text-align:center}}
+  .change-cell{{color:#ccd6e0;font-size:0.83rem;line-height:1.5}}
+  .change-cell small{{color:#7788aa;font-size:0.78rem}}
+  .stats{{margin-top:18px;display:flex;gap:24px;font-size:0.82rem;color:#7799aa}}
+  .stats span{{background:#1a1a2e;padding:6px 14px;border-radius:6px}}
+</style></head><body>
+<h2>完整阶段时间轴（{first_date_str[:7].replace("-","年",1).replace("-","月")} ～ {last_date_str}）</h2>
+<table>
+  <thead><tr>
+    <th>阶段</th><th>时间段</th><th style="text-align:center">天数</th>
+    <th>指数变化</th><th>操作</th>
+  </tr></thead>
+  <tbody>{rows_html}
+  </tbody>
+</table>
+<div class="stats">
+  <span>★ 做波段：{phase_stats["做波段"]}天 ({phase_stats["做波段"]/sum(phase_stats.values())*100:.0f}%)</span>
+  <span>△ 企稳观察：{phase_stats["企稳观察"]}天 ({phase_stats["企稳观察"]/sum(phase_stats.values())*100:.0f}%)</span>
+  <span>▼ 空仓：{phase_stats["空仓"]}天 ({phase_stats["空仓"]/sum(phase_stats.values())*100:.0f}%)</span>
+</div>
+</body></html>'''
+
+out_path = os.path.join(os.path.dirname(__file__), '..', 'output', '大盘阶段时间轴.html')
+out_path = os.path.normpath(out_path)
+os.makedirs(os.path.dirname(out_path), exist_ok=True)
+with open(out_path, 'w', encoding='utf-8') as f:
+    f.write(html)
+print(f'\n  HTML → {out_path}')
+webbrowser.open('file:///' + out_path.replace('\\', '/'))
